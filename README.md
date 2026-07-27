@@ -12,7 +12,9 @@ n8n (orquestación IA) · TanStack Query.
 ## Estado del proyecto
 
 - ✅ **Fase 1 — Base de datos (Supabase)**: migraciones, funciones/triggers, RLS.
-- ⏳ **Fase 2 — Frontend**: pendiente de assets de diseño (Stitch) y build de la app.
+- ✅ **Fase 2 — Frontend**: scaffold Vite+React+TS+Tailwind, capa de datos tipada, Kanban,
+  workspace conversacional, flujo de pago, panel de expedientes. Logo y pantalla "Workspace"
+  de Stitch aún pendientes (ver Design System).
 - ⏳ **Fase 3 — Integración n8n**: pendiente.
 
 ## Fase 1 · Base de datos
@@ -90,9 +92,65 @@ Copia `.env.example` a `.env` y completa las variables. Nunca commitees `.env` c
 reales; `SUPABASE_SERVICE_ROLE_KEY` y `SPECTER_WEBHOOK_SECRET` en particular nunca deben llegar
 al bundle del frontend.
 
+## Fase 2 · Frontend
+
+Stack: Vite + React + TypeScript (estricto) + Tailwind + componentes estilo shadcn/ui (Radix +
+CVA, escritos a mano — ver nota abajo) + Supabase JS + TanStack Query + react-router-dom + dnd-kit
+(drag-and-drop del Kanban).
+
+### Estructura
+
+- `src/lib/supabaseClient.ts` — único punto de creación del cliente Supabase (anon key).
+- `src/api/*` — capa de acceso a datos tipada con `database.types.ts`. Ningún componente llama a
+  `supabase.from(...)` directamente.
+- `src/hooks/*` — hooks de TanStack Query envolviendo `src/api/*` (`useCasos`,
+  `useUpdateCasoStatus` con actualización optimista, `useProfile`, `usePagos`, `useExpedientes`,
+  `useDocumentosByCaso`, `useSignedPdfUrl`).
+- `src/components/ui/*` — primitivos (Button, Card, Input, Slider, Switch, Badge, Dialog) estilo
+  shadcn/ui, montados sobre Radix UI y estilizados con los tokens de `styles/tokens.css`.
+- `src/features/*` — `auth` (login/registro + `AuthProvider`/`ProtectedRoute`), `kanban` (tablero
+  drag-and-drop), `workspace` (sliders + sincronización de dark mode), `documents` (visor
+  Markdown + descarga de PDF vía signed URL), `payments` (CTA de tarifa fija), `expedientes`
+  (tabla de vigilancia B2B).
+- `src/styles/tokens.css` — tokens extraídos de `design/design-system.md` (real, exportado de
+  Stitch). Ver el comentario en ese archivo sobre la superposición YAML/prosa del asset y el
+  TODO de light mode (la prosa no trae hex para modo claro, así que no se inventó ninguno).
+
+### Nota sobre shadcn/ui
+
+Este entorno no tiene acceso interactivo a la CLI de `shadcn-ui` (requiere prompts + red al
+registro de componentes). Los primitivos en `src/components/ui/` están escritos a mano siguiendo
+exactamente el mismo patrón que genera esa CLI (Radix UI + `class-variance-authority` + `cn()`),
+así que son intercambiables 1:1 si más adelante corres `npx shadcn-ui add <componente>`.
+
+### Setup
+
+```bash
+cp .env.example .env   # completa VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY
+npm install
+npm run dev
+```
+
+`npm run build` corre `tsc -b` (estricto) + `vite build`; ambos pasan limpios en este commit.
+
+### Validación manual (sin Supabase real disponible en este entorno)
+
+Sin Docker no se pudo levantar `supabase start` para probar contra un backend real. Se validó en
+su lugar, con Playwright headless contra `npm run dev` y credenciales de Supabase dummy:
+
+- `/auth` renderiza login y registro, sin errores de consola.
+- Una sesión inyectada en `localStorage` atraviesa `ProtectedRoute` y monta el `AppShell`
+  (sidebar con indicador copper de ruta activa, Kanban, "Cargando casos…" mientras el fetch real
+  falla contra el host dummy — comportamiento esperado sin backend).
+
+**Pendiente de una validación real contra Supabase**: crear dos usuarios, confirmar que el
+Kanban solo muestra sus propios casos, que el drag-and-drop persiste `status`, que los sliders
+sobreviven a un refresh, y que el flujo de pago (una vez exista la Edge Function `crear-pago` de
+la Fase 3) redirige a Mercado Pago.
+
 ## Próximos pasos
 
-- Fase 2: assets de diseño de Stitch (logo + pantalla de workspace pendientes; el design system
-  ya está en `design/design-system.md`), scaffold del frontend, Kanban, workspace conversacional,
-  flujo de pago.
-- Fase 3: Edge Function de firma HMAC + webhook de n8n + integración Mercado Pago.
+- Fase 2 (pendiente): logo y pantalla "Workspace" de Stitch (aplicar al favicon/branding real y
+  afinar el layout del workspace conversacional contra el mockup).
+- Fase 3: Edge Function de firma HMAC + webhook de n8n + integración Mercado Pago (incluye la
+  función `crear-pago` que ya consume `src/api/pagos.ts`).

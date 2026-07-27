@@ -1,0 +1,126 @@
+/*
+ * Specter · Design tokens
+ *
+ * Fuente: design/design-system.md (asset real exportado de Stitch, screen
+ * "Design System"). Ese documento trae DOS fuentes de color superpuestas:
+ *
+ *  1. Un bloque YAML (Material 3 dynamic color, auto-generado) con tokens
+ *     como `primary: #ffb59e`.
+ *  2. La sección prosa "Colors"/"Elevation" con hex explícitos para el
+ *     lenguaje visual real del producto (Canvas #0F1012, Copper Orange
+ *     #FF4F00, etc.), justificados con la narrativa de marca.
+ *
+ * Para las superficies y el acento primario usamos los hex explícitos de la
+ * prosa (son los que describen intención de marca real: "Copper Orange
+ * (#FF4F00)... usado para CTAs de alta prioridad"). Para roles que la prosa
+ * NO especifica en hex (secondary/tertiary/error/outline) usamos el bloque
+ * YAML, que sí los define. Tipografía, radii y spacing SÍ coinciden entre
+ * ambas fuentes (ver comentarios inline) — no hay ambigüedad ahí.
+ *
+ * Light mode: la prosa solo lo describe cualitativamente ("warm chalk
+ * aesthetic", "muted charcoal green-grey") sin hex. No hay valor real que
+ * extraer del asset, así que NO se inventa uno — ver el TODO en `.light`.
+ */
+
+:root {
+  /* --- Elevación ("Step-Up" model, prosa §Elevation & Depth) --- */
+  --color-canvas: #0f1012;             /* Level 0 */
+  --color-surface-panel: #1c1c1e;      /* Level 1: sidebars, contenedores secundarios */
+  --color-surface-interactive: #2b2b2b; /* Level 2: cards, elementos activos */
+  --color-border: #2e2e30;             /* borde 1px estándar de listas/inputs/paneles */
+  --color-border-glass: rgba(255, 255, 255, 0.1); /* borde de overlays con blur */
+
+  /* --- Acento de marca (prosa §Colors, §Components) --- */
+  --color-copper: #ff4f00;
+  --color-copper-glow: rgba(255, 79, 0, 0.35); /* base para el glow de 8-12px en CTAs */
+  --color-on-copper: #ffffff;
+
+  /* --- Roles semánticos restantes (YAML Material3, modo oscuro) --- */
+  --color-on-surface: #e3e2e4;
+  --color-on-surface-variant: #e6beb2;
+  --color-secondary: #c8c6c8;
+  --color-on-secondary: #303032;
+  --color-secondary-container: #474649;
+  --color-tertiary: #c8c6c5;
+  --color-error: #ffb4ab;
+  --color-on-error: #690005;
+  --color-error-container: #93000a;
+  --color-on-error-container: #ffdad6;
+  --color-outline: #ac897e;
+  --color-outline-variant: #5c4037;
+
+  /* --- Tipografía (Inter; YAML y prosa coinciden) --- */
+  --font-family-base: Inter, system-ui, sans-serif;
+
+  --text-display-size: 48px;
+  --text-display-weight: 600;
+  --text-display-leading: 56px;
+  --text-display-tracking: -0.02em;
+
+  --text-headline-lg-size: 32px;
+  --text-headline-lg-weight: 600;
+  --text-headline-lg-leading: 40px;
+  --text-headline-lg-tracking: -0.02em;
+
+  --text-headline-lg-mobile-size: 24px;
+  --text-headline-lg-mobile-weight: 600;
+  --text-headline-lg-mobile-leading: 32px;
+  --text-headline-lg-mobile-tracking: -0.01em;
+
+  --text-headline-md-size: 24px;
+  --text-headline-md-weight: 500;
+  --text-headline-md-leading: 32px;
+  --text-headline-md-tracking: -0.01em;
+
+  --text-body-lg-size: 18px;
+  --text-body-lg-weight: 400;
+  --text-body-lg-leading: 28px;
+
+  --text-body-md-size: 16px;
+  --text-body-md-weight: 400;
+  --text-body-md-leading: 24px;
+
+  --text-label-md-size: 14px;
+  --text-label-md-weight: 500;
+  --text-label-md-leading: 20px;
+  --text-label-md-tracking: 0.02em;
+
+  --text-label-sm-size: 12px;
+  --text-label-sm-weight: 600;
+  --text-label-sm-leading: 16px;
+  --text-label-sm-tracking: 0.05em;
+
+  /* --- Radii ("Soft-Geometric", prosa §Shapes — coincide con YAML `rounded`) --- */
+  --radius-sm: 0.125rem;   /* checkboxes, tags pequeños (prosa: 4px reales via DEFAULT) */
+  --radius-DEFAULT: 0.25rem; /* 4px: componentes pequeños */
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;     /* 8px: inputs, botones, cards */
+  --radius-xl: 0.75rem;    /* 12px: paneles de workspace, modales */
+  --radius-full: 9999px;
+
+  /* --- Spacing (baseline 4px, prosa §Layout & Spacing) --- */
+  --spacing-unit: 4px;
+  --spacing-gutter: 24px;
+  --spacing-margin-mobile: 16px;
+  --spacing-margin-desktop: 40px;
+  --spacing-sidebar-width: 280px;
+  --spacing-max-content-width: 1200px;
+
+  /* --- Blur/glass (prosa §Elevation & Depth) --- */
+  --blur-glass: 20px;
+
+  color-scheme: dark;
+}
+
+/*
+ * TODO(design): la prosa del design system describe el modo claro solo en
+ * términos cualitativos ("warm chalk aesthetic", "muted charcoal green-grey"
+ * para texto secundario) sin hex concretos. No se inventan valores acá — en
+ * cuanto exista una exportación de Stitch para light mode con hex reales,
+ * reemplazar este bloque. Mientras tanto `.light` hereda los tokens oscuros
+ * para no romper contraste, y el toggle de modo (workspace_config.is_dark_mode)
+ * queda cableado pero visualmente sin efecto hasta tener los valores reales.
+ */
+.light {
+  color-scheme: dark;
+}

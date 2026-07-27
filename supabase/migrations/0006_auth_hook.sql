@@ -1,0 +1,21 @@
+-- Specter · Fase 1 · Auth Hook
+--
+-- Decisión (confirmada con el usuario): el aislamiento multi-tenant se
+-- resuelve vía public.current_tenant_id() (0004), que consulta profiles en
+-- cada request, NO vía un Custom Access Token Hook que inyecte un claim
+-- supabase_tenant_id en el JWT.
+--
+-- Motivo: un claim personalizado exige mantener un Auth Hook sincronizado con
+-- profiles.tenant_id (y forzar refresh de sesión si el tenant cambia), lo
+-- cual es una fuente extra de bugs de seguridad si se desincroniza. Resolver
+-- el tenant en cada consulta desde profiles es más lento por fila pero
+-- siempre refleja el estado real de la tabla, y current_tenant_id() es
+-- STABLE (se evalúa una sola vez por statement).
+--
+-- Este archivo queda como no-op para conservar la numeración de migraciones
+-- del proyecto (0001-0006) y como punto de extensión documentado si en el
+-- futuro se necesita un Custom Access Token Hook para otro propósito (p.ej.
+-- MFA, rate limiting por claim). No configura ningún hook en
+-- auth.config / Supabase Dashboard.
+
+SELECT 1; -- no-op intencional

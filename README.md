@@ -15,7 +15,10 @@ n8n (orquestación IA) · TanStack Query.
 - ✅ **Fase 2 — Frontend**: scaffold Vite+React+TS+Tailwind, capa de datos tipada, Kanban,
   workspace conversacional, flujo de pago, panel de expedientes. Logo y pantalla "Workspace"
   de Stitch aún pendientes (ver Design System).
-- ⏳ **Fase 3 — Integración n8n**: pendiente.
+- ✅ **Fase 3 — Integración n8n + pagos**: Edge Functions (firma HMAC, checkout y webhook de
+  Mercado Pago), Code node de validación para n8n, bucket privado de Storage.
+
+Seguridad: ver [`SECURITY.md`](./SECURITY.md) — modelo RLS, manejo de secretos y flujo HMAC.
 
 ## Fase 1 · Base de datos
 
@@ -33,6 +36,8 @@ Migraciones en `supabase/migrations/`, en orden:
 5. `0005_rls.sql` — políticas RLS (lectura y escritura) de las seis tablas.
 6. `0006_auth_hook.sql` — no-op documentado: el aislamiento de tenant se resuelve con
    `current_tenant_id()`, no con un claim JWT personalizado.
+7. `0007_storage.sql` — bucket privado `documentos-privados` + políticas de `storage.objects`
+   acotadas por caso/tenant (solo lectura para el cliente).
 
 ### Decisiones clave (ver comentarios `-- FIX:` en las migraciones)
 
@@ -148,9 +153,64 @@ Kanban solo muestra sus propios casos, que el drag-and-drop persiste `status`, q
 sobreviven a un refresh, y que el flujo de pago (una vez exista la Edge Function `crear-pago` de
 la Fase 3) redirige a Mercado Pago.
 
+## Fase 3 · Integración n8n + Mercado Pago
+
+Flujo completo documentado en [`n8n/README.md`](./n8n/README.md) y
+[`SECURITY.md`](./SECURITY.md).
+
+### Edge Functions (`supabase/functions/`)
+
+| Función | Qué hace | JWT |
+|---|---|---|
+| `procesar-caso` | Valida sesión y pertenencia del caso, serializa el payload de forma canónica, lo firma con HMAC-SHA256 y hace el POST a n8n. Existe para que `SPECTER_WEBHOOK_SECRET` nunca llegue al navegador. | requerido |
+| `crear-pago` | Crea el registro `pagos` en `pendiente` (service role) y la preferencia de checkout de Mercado Pago. Devuelve `checkoutUrl`. | requerido |
+| `mercadopago-webhook` | Único punto que mueve un pago a `exitoso`/`fallido`. Verifica `x-signature`, consulta el pago a la API de MP (no confía en el body) y actualiza de forma idempotente. | **sin JWT** |
+| `_shared/canonical.ts` | Serialización canónica determinista + HMAC + comparación en tiempo constante. | — |
+
+### Despliegue
+
+```bash
+# Secrets (ver .env.example para la lista completa)
+supabase secrets set SPECTER_APP_ORIGIN=https://app.specter.co
+supabase secrets set SPECTER_WEBHOOK_SECRET=...
+supabase secrets set N8N_WEBHOOK_URL=...
+supabase secrets set MERCADOPAGO_ACCESS_TOKEN=...
+supabase secrets set MERCADOPAGO_WEBHOOK_SECRET=...
+
+supabase functions deploy procesar-caso
+supabase functions deploy crear-pago
+# El webhook lo llama Mercado Pago, no un usuario con sesión:
+supabase functions deploy mercadopago-webhook --no-verify-jwt
+```
+
+En n8n: importa el Code node de [`n8n/validar-firma.js`](./n8n/validar-firma.js) como primer
+nodo tras el Webhook, activa **Raw Body = ON** en el Webhook, y define
+`SPECTER_WEBHOOK_SECRET` como variable de entorno de n8n (mismo valor que en Supabase).
+
+### Validación realizada
+
+Sin Docker no se pudo levantar el stack de Supabase ni una instancia de n8n, así que se validó
+la lógica criptográfica ejecutando el código real de `_shared/canonical.ts` sobre WebCrypto (la
+misma API que usa Deno) y comparándolo contra `crypto.createHmac` de Node (la que usa n8n):
+
+- Ambos producen **firmas idénticas** para el mismo payload canónico, incluyendo UTF-8
+  multibyte (`ñ á é í ó ú —`).
+- La validación de n8n acepta la firma legítima y rechaza firma vacía, truncada, incorrecta de
+  igual longitud, body alterado (tampering) y firma con otro secreto.
+- La verificación de Mercado Pago acepta la firma válida y rechaza `v1` incorrecto, headers
+  faltantes, `ts` alterado, `data.id` alterado y otro secreto.
+- Las 7 migraciones aplican limpio, y en el bucket privado cada usuario solo lista el PDF de su
+  propio caso sin poder subir objetos.
+
+**Pendiente de prueba end-to-end** contra una instancia real de n8n y el sandbox de Mercado
+Pago.
+
 ## Próximos pasos
 
-- Fase 2 (pendiente): logo y pantalla "Workspace" de Stitch (aplicar al favicon/branding real y
-  afinar el layout del workspace conversacional contra el mockup).
-- Fase 3: Edge Function de firma HMAC + webhook de n8n + integración Mercado Pago (incluye la
-  función `crear-pago` que ya consume `src/api/pagos.ts`).
+- Logo y pantalla "Workspace" de Stitch (aplicar al favicon/branding real y afinar el layout del
+  workspace conversacional contra el mockup). El favicon actual es un placeholder.
+- Flujo de invitación B2B (`TODO` en `0004_functions_triggers.sql`): los abogados de una firma
+  deben unirse a un tenant existente con `role = 'abogado_premium'`, no crear uno personal.
+- Light mode: el design system no trae hex para modo claro (ver `TODO(design)` en
+  `src/styles/tokens.css`).
+- Prueba end-to-end de la Fase 3 contra n8n y Mercado Pago reales.

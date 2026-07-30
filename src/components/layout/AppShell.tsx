@@ -1,12 +1,13 @@
 import type { ReactNode } from 'react'
 import { NavLink } from 'react-router-dom'
-import { Briefcase, LogOut, ScrollText } from 'lucide-react'
+import { Briefcase, LogOut, ScrollText, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { signOut } from '@/api/auth'
 
 const navItems = [
   { to: '/', label: 'Casos', icon: Briefcase },
   { to: '/expedientes', label: 'Expedientes', icon: ScrollText },
+  { to: '/equipo', label: 'Equipo', icon: Users },
 ]
 
 export function AppShell({ children }: { children: ReactNode }) {

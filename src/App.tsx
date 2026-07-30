@@ -3,6 +3,7 @@ import { AuthPage } from '@/pages/AuthPage'
 import { KanbanPage } from '@/pages/KanbanPage'
 import { WorkspacePage } from '@/pages/WorkspacePage'
 import { ExpedientesPage } from '@/pages/ExpedientesPage'
+import { EquipoPage } from '@/pages/EquipoPage'
 import { ProtectedRoute } from '@/features/auth/ProtectedRoute'
 import { DarkModeSync } from '@/features/workspace/DarkModeSync'
 import { useSession } from '@/features/auth/AuthProvider'
@@ -36,6 +37,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <ExpedientesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/equipo"
+          element={
+            <ProtectedRoute>
+              <EquipoPage />
             </ProtectedRoute>
           }
         />

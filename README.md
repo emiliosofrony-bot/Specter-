@@ -38,6 +38,9 @@ Migraciones en `supabase/migrations/`, en orden:
    `current_tenant_id()`, no con un claim JWT personalizado.
 7. `0007_storage.sql` — bucket privado `documentos-privados` + políticas de `storage.objects`
    acotadas por caso/tenant (solo lectura para el cliente).
+8. `0008_invitaciones.sql` — onboarding B2B por invitación: tabla `invitaciones` con token
+   hasheado y `handle_new_user` que une al invitado al tenant de su firma como
+   `abogado_premium`.
 
 ### Decisiones clave (ver comentarios `-- FIX:` en las migraciones)
 
@@ -49,8 +52,8 @@ Migraciones en `supabase/migrations/`, en orden:
   cliente no puede crear pagos ni marcarlos `exitoso`; eso lo hace el backend (webhook de
   Mercado Pago) con la `service_role` key, que bypassa RLS.
 - **Cada ciudadano (B2C) recibe un tenant personal** al registrarse (trigger
-  `handle_new_user`). Los usuarios B2B (abogados de una firma) necesitan un flujo de invitación
-  aparte — ver el `TODO` en `0004_functions_triggers.sql`.
+  `handle_new_user`). Los abogados B2B se unen al tenant de su firma mediante una invitación
+  con token (`0008_invitaciones.sql`), no creando un tenant propio.
 - Un trigger (`prevent_profile_privilege_escalation`) impide que un usuario autenticado cambie
   su propio `role` o `tenant_id` desde el cliente, incluso teniendo permiso de `UPDATE` sobre su
   fila de `profiles`.
@@ -165,6 +168,7 @@ Flujo completo documentado en [`n8n/README.md`](./n8n/README.md) y
 | `procesar-caso` | Valida sesión y pertenencia del caso, serializa el payload de forma canónica, lo firma con HMAC-SHA256 y hace el POST a n8n. Existe para que `SPECTER_WEBHOOK_SECRET` nunca llegue al navegador. | requerido |
 | `crear-pago` | Crea el registro `pagos` en `pendiente` (service role) y la preferencia de checkout de Mercado Pago. Devuelve `checkoutUrl`. | requerido |
 | `mercadopago-webhook` | Único punto que mueve un pago a `exitoso`/`fallido`. Verifica `x-signature`, consulta el pago a la API de MP (no confía en el body) y actualiza de forma idempotente. | **sin JWT** |
+| `invitar-abogado` | Valida que quien invita sea `abogado_premium` de un tenant B2B activo, genera el token con CSPRNG y guarda solo su hash. Devuelve el enlace una sola vez. | requerido |
 | `_shared/canonical.ts` | Serialización canónica determinista + HMAC + comparación en tiempo constante. | — |
 
 ### Despliegue
@@ -179,6 +183,7 @@ supabase secrets set MERCADOPAGO_WEBHOOK_SECRET=...
 
 supabase functions deploy procesar-caso
 supabase functions deploy crear-pago
+supabase functions deploy invitar-abogado
 # El webhook lo llama Mercado Pago, no un usuario con sesión:
 supabase functions deploy mercadopago-webhook --no-verify-jwt
 ```
@@ -199,8 +204,21 @@ misma API que usa Deno) y comparándolo contra `crypto.createHmac` de Node (la q
   igual longitud, body alterado (tampering) y firma con otro secreto.
 - La verificación de Mercado Pago acepta la firma válida y rechaza `v1` incorrecto, headers
   faltantes, `ts` alterado, `data.id` alterado y otro secreto.
-- Las 7 migraciones aplican limpio, y en el bucket privado cada usuario solo lista el PDF de su
+- Las 8 migraciones aplican limpio, y en el bucket privado cada usuario solo lista el PDF de su
   propio caso sin poder subir objetos.
+
+## Onboarding B2B (invitaciones)
+
+Un abogado no puede unirse solo a una firma: el trigger anti-escalación se lo impide. El flujo
+es `abogado_premium` → `invitar-abogado` → enlace `/auth?invite=<token>&email=<correo>` → el
+invitado se registra y `handle_new_user` lo une al tenant de la firma. Detalles de seguridad en
+[`SECURITY.md`](./SECURITY.md).
+
+Verificado contra Postgres real: el alta con invitación válida entra como `abogado_premium` y ve
+los casos de su firma (no los ajenos); el alta sin invitación sigue creando tenant personal como
+`ciudadano`. Se rechazan token inválido, token emitido para otro correo, token ya usado, token
+expirado y firma con suscripción vencida. Un cliente no puede crear invitaciones ni leer
+`token_hash`. El SHA-256 de la Edge Function coincide con el de Postgres, incluido UTF-8.
 
 **Pendiente de prueba end-to-end** contra una instancia real de n8n y el sandbox de Mercado
 Pago.
@@ -209,8 +227,8 @@ Pago.
 
 - Logo y pantalla "Workspace" de Stitch (aplicar al favicon/branding real y afinar el layout del
   workspace conversacional contra el mockup). El favicon actual es un placeholder.
-- Flujo de invitación B2B (`TODO` en `0004_functions_triggers.sql`): los abogados de una firma
-  deben unirse a un tenant existente con `role = 'abogado_premium'`, no crear uno personal.
+- Envío del enlace de invitación por correo desde el servidor (hoy se devuelve al cliente para
+  compartirlo manualmente; `TODO(email)` en `invitar-abogado`).
 - Light mode: el design system no trae hex para modo claro (ver `TODO(design)` en
   `src/styles/tokens.css`).
 - Prueba end-to-end de la Fase 3 contra n8n y Mercado Pago reales.

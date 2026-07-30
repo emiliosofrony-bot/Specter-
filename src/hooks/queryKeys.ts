@@ -8,4 +8,5 @@ export const queryKeys = {
   pagos: ['pagos'] as const,
   pago: (id: string) => ['pagos', id] as const,
   expedientes: ['expedientes'] as const,
+  invitaciones: ['invitaciones'] as const,
 }

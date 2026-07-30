@@ -231,6 +231,60 @@ export type Database = {
           },
         ]
       }
+      invitaciones: {
+        Row: {
+          id: string
+          tenant_id: string
+          email: string
+          role: Database['public']['Enums']['rol_usuario']
+          token_hash: string
+          invited_by: string | null
+          expires_at: string
+          accepted_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          email: string
+          role?: Database['public']['Enums']['rol_usuario']
+          token_hash: string
+          invited_by?: string | null
+          expires_at?: string
+          accepted_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          email?: string
+          role?: Database['public']['Enums']['rol_usuario']
+          token_hash?: string
+          invited_by?: string | null
+          expires_at?: string
+          accepted_at?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'invitaciones_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'invitaciones_invited_by_fkey'
+            columns: ['invited_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       expedientes_judiciales: {
         Row: {
           id: string
@@ -292,6 +346,10 @@ export type Database = {
       verificar_suscripcion_activa: {
         Args: { target_tenant_id: string }
         Returns: boolean
+      }
+      hash_invitacion_token: {
+        Args: { token: string }
+        Returns: string
       }
     }
     Enums: {

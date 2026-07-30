@@ -62,6 +62,35 @@ podría crear un pago ya marcado como `exitoso` y descargar sin pagar. La
 creación del registro `pendiente` y la transición a `exitoso`/`fallido` son
 exclusivas del backend confiable.
 
+### Onboarding B2B por invitación
+
+Un abogado no puede auto-asignarse `role = 'abogado_premium'` ni moverse al
+tenant de una firma (lo impide el trigger de escalación). La única vía es una
+invitación emitida por el backend (`0008_invitaciones.sql` +
+`invitar-abogado`). Defensas aplicadas:
+
+- **El token se guarda hasheado** (SHA-256). Un dump o un log de query no
+  entrega tokens usables. El token en claro solo existe en la respuesta de la
+  Edge Function, una sola vez.
+- **Generado con CSPRNG** de 32 bytes (`crypto.getRandomValues`), server-side.
+- **Atado al correo**: la invitación solo sirve para el email al que se emitió.
+  Sin esto, un token filtrado (reenvío de correo, historial de chat) daría
+  acceso a la firma a cualquiera.
+- **Un solo uso y con expiración** (7 días); el `SELECT … FOR UPDATE` en el
+  trigger evita que dos registros concurrentes acepten la misma invitación.
+- **Suscripción verificada**: una firma con `is_active = false` no puede seguir
+  sumando miembros (usa `verificar_suscripcion_activa`).
+- **Quien invita es validado**: la Edge Function exige `abogado_premium` de un
+  tenant B2B activo. La tabla no tiene política de escritura, así que un cliente
+  no puede insertarse una invitación al tenant de otra firma.
+- **`token_hash` no se expone**: se revoca el `SELECT` de tabla para
+  `authenticated` y se re-otorga columna por columna.
+
+> **Pendiente**: el enlace de invitación se devuelve al cliente para que lo
+> comparta manualmente. Enviarlo por correo desde el servidor (TODO marcado en
+> `invitar-abogado`) reduciría la exposición del token al canal que use quien
+> invita.
+
 ### Escalación de privilegios en `profiles`
 
 El cliente necesita `UPDATE` sobre su propia fila de `profiles` para persistir
@@ -97,6 +126,14 @@ Verificado contra un PostgreSQL 16 real (con un stub mínimo de los esquemas
   `workspace_config`.
 - Cada usuario solo lista el PDF de su propio caso en el bucket privado, y no
   puede subir objetos.
+- Onboarding B2B: un registro con invitación válida entra a la firma como
+  `abogado_premium` y ve los casos de su firma (no los ajenos); uno sin
+  invitación sigue creando tenant personal como `ciudadano`. Se rechaza el
+  registro con token inválido, token de otro correo, token ya usado, token
+  expirado, y firma con suscripción vencida. Un cliente no puede crear
+  invitaciones ni leer `token_hash`.
+- El SHA-256 de la Edge Function (WebCrypto) coincide con
+  `public.hash_invitacion_token()` (pgcrypto), incluido UTF-8 multibyte.
 
 Pendiente de re-verificar contra un proyecto Supabase real antes de producción.
 

@@ -1,10 +1,15 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { LoginForm } from '@/features/auth/LoginForm'
 import { RegisterForm } from '@/features/auth/RegisterForm'
 
 export function AuthPage() {
-  const [mode, setMode] = useState<'login' | 'register'>('login')
+  const [searchParams] = useSearchParams()
+  // Quien llega por un enlace de invitación necesita registrarse, no ingresar.
+  const [mode, setMode] = useState<'login' | 'register'>(
+    searchParams.has('invite') ? 'register' : 'login',
+  )
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-canvas px-margin-mobile">
